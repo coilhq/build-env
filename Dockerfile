@@ -20,6 +20,7 @@ RUN apt-get update && apt-get install -y \
     apt-transport-https \
     lsb-release \
     gnupg \
+    unzip \
  && rm -rf /var/lib/apt/lists/*
 
 # Install Docker
@@ -69,5 +70,10 @@ RUN easy_install -U pip \
  && gcloud config set metrics/environment github_docker_image \
  && gcloud --version \
  && docker --version && kubectl version --client
+
+# Install terraform
+RUN TERRAFORM_URL=https://releases.hashicorp.com/terraform/0.11.8/terraform_0.11.8_linux_amd64.zip \
+    && curl --silent --show-error --location --fail --retry 3 --output /tmp/terraform.zip $TERRAFORM_URL \
+    && unzip /tmp/terraform.zip -d /usr/bin/
 
 CMD ["/bin/sh"]
