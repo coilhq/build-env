@@ -46,7 +46,7 @@ RUN COMPOSE_URL="https://circle-downloads.s3.amazonaws.com/circleci-images/cache
  && docker-compose version
 
 # Install gcloud
-ENV CLOUD_SDK_VERSION 212.0.0
+ENV CLOUD_SDK_VERSION 213.0.0
 RUN easy_install -U pip \
  && pip install -U crcmod \
  && export CLOUD_SDK_REPO="cloud-sdk-$(lsb_release -c -s)" \
@@ -72,8 +72,22 @@ RUN easy_install -U pip \
  && docker --version && kubectl version --client
 
 # Install terraform
-RUN TERRAFORM_URL=https://releases.hashicorp.com/terraform/0.11.8/terraform_0.11.8_linux_amd64.zip \
+ENV TERRAFORM_VERSION 0.11.8
+RUN TERRAFORM_URL=https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip \
     && curl --silent --show-error --location --fail --retry 3 --output /tmp/terraform.zip $TERRAFORM_URL \
-    && unzip /tmp/terraform.zip -d /usr/bin/
+    && unzip /tmp/terraform.zip -d /usr/bin/ \
+    && rm /tmp/terraform.zip
+
+# Install Node.js
+ENV NODE_VERSION 10.9.0
+RUN curl -fsSLO --compressed "https://nodejs.org/dist/v$NODE_VERSION/node-v$NODE_VERSION-linux-x64.tar.xz" \
+ && tar -xJf "node-v$NODE_VERSION-linux-x64.tar.xz" -C /usr/local --strip-components=1 --no-same-owner \
+ && rm "node-v$NODE_VERSION-linux-x64.tar.xz" \
+ && ln -s /usr/local/bin/node /usr/local/bin/nodejs
+
+# Install greenkeeper-lockfile
+ENV GREENKEEPER_LOCKFILE_VERSION 2.5.0
+RUN npm install -g greenkeeper-lockfile@$GREENKEEPER_LOCKFILE_VERSION \
+ && rm -rf $HOME/.npm
 
 CMD ["/bin/sh"]
