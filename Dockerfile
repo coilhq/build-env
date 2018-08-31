@@ -90,4 +90,9 @@ ENV GREENKEEPER_LOCKFILE_VERSION 2.5.0
 RUN npm install -g greenkeeper-lockfile@$GREENKEEPER_LOCKFILE_VERSION \
  && rm -rf $HOME/.npm
 
+# Install Verdaccio
+ENV VERDACCIO_VERSION 3.7.1
+RUN npm install -g verdaccio@$VERDACCIO_VERSION \
+ && rm -rf $HOME/.npm
+
 CMD ["/bin/sh"]
