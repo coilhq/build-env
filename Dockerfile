@@ -95,4 +95,9 @@ ENV VERDACCIO_VERSION 3.7.1
 RUN npm install -g verdaccio@$VERDACCIO_VERSION \
  && rm -rf $HOME/.npm
 
+# Install wait-on
+ENV WAIT_ON_VERSION 2.1.0
+RUN npm install -g wait-on@$WAIT_ON_VERSION \
+ && rm -rf $HOME/.npm
+
 CMD ["/bin/sh"]
