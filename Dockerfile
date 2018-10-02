@@ -78,6 +78,15 @@ RUN TERRAFORM_URL=https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/
     && unzip /tmp/terraform.zip -d /usr/bin/ \
     && rm /tmp/terraform.zip
 
+# Install Helm Terraform Provider
+ENV HELM_PROVIDER_VERSION 0.6.0
+RUN HELM_PROVIDER_URL=https://github.com/mcuadros/terraform-provider-helm/releases/download/v${HELM_PROVIDER_VERSION}/terraform-provider-helm_v${HELM_PROVIDER_VERSION}_linux_amd64.tar.gz \
+    && curl --silent --show-error --location --fail --retry 3 --output /tmp/helm_provider.tar.gz $HELM_PROVIDER_URL \
+    && mkdir -p ~/.terraform.d/plugins/ \
+    && tar -xvf /tmp/helm_provider.tar.gz -C /tmp \
+    && mv /tmp/terraform-provider-helm_linux_amd64/terraform-provider-helm ~/.terraform.d/plugins/ \
+    && rm /tmp/helm_provider.tar.gz
+
 # Install Node.js
 ENV NODE_VERSION 10.9.0
 RUN curl -fsSLO --compressed "https://nodejs.org/dist/v$NODE_VERSION/node-v$NODE_VERSION-linux-x64.tar.xz" \
