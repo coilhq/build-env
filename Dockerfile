@@ -72,7 +72,7 @@ RUN easy_install -U pip \
  && docker --version && kubectl version --client
 
 # Install terraform
-ENV TERRAFORM_VERSION 0.11.9
+ENV TERRAFORM_VERSION 0.11.10
 RUN TERRAFORM_URL=https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip \
     && curl --silent --show-error --location --fail --retry 3 --output /tmp/terraform.zip $TERRAFORM_URL \
     && unzip /tmp/terraform.zip -d /usr/bin/ \
