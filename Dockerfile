@@ -1,103 +1,102 @@
-FROM docker:18.06.0-ce AS docker-source
+### Forked from circleci/node:10.15.1-stretch
 
-FROM debian:stretch
+FROM node:10.15.1-stretch
+
+# make Apt non-interactive
+RUN echo 'APT::Get::Assume-Yes "true";' > /etc/apt/apt.conf.d/90circleci \
+      && echo 'DPkg::Options "--force-confnew";' >> /etc/apt/apt.conf.d/90circleci
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install basic dependencies (git, ssh, etc.)
-RUN apt-get update && apt-get install -y \
-    git \
-    openssh-client \
-    sudo \
-    tar \
-    gzip \
-    ca-certificates \
-    locales \
-    curl \
-    gcc \
-    python-dev \
-    python-setuptools \
-    apt-transport-https \
-    lsb-release \
-    gnupg \
-    unzip \
- && rm -rf /var/lib/apt/lists/*
+# man directory is missing in some base images
+# https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=863199
+RUN apt-get update \
+      && mkdir -p /usr/share/man/man1 \
+      && apt-get install -y \
+      git mercurial xvfb apt \
+      locales sudo openssh-client ca-certificates tar gzip parallel \
+      net-tools netcat unzip zip bzip2 gnupg curl wget
+
+
+# Set timezone to UTC by default
+RUN ln -sf /usr/share/zoneinfo/Etc/UTC /etc/localtime
+
+# Use unicode
+RUN locale-gen C.UTF-8 || true
+ENV LANG=C.UTF-8
+
+# install jq
+RUN JQ_URL="https://circle-downloads.s3.amazonaws.com/circleci-images/cache/linux-amd64/jq-latest" \
+      && curl --silent --show-error --location --fail --retry 3 --output /usr/bin/jq $JQ_URL \
+      && chmod +x /usr/bin/jq \
+      && jq --version
 
 # Install Docker
-COPY --from=docker-source /usr/local/bin/docker /usr/local/bin/docker
 
-# Install Docker
-# RUN set -ex \
-#  && export DOCKER_VERSION=$(curl --silent --fail --retry 3 https://download.docker.com/linux/static/stable/x86_64/ | grep -o -e 'docker-[.0-9]*-ce\.tgz' | sort -r | head -n 1) \
-#  && DOCKER_URL="https://download.docker.com/linux/static/stable/x86_64/${DOCKER_VERSION}" \
-#  && echo Docker URL: $DOCKER_URL \
-#  && curl --silent --show-error --location --fail --retry 3 --output /tmp/docker.tgz "${DOCKER_URL}" \
-#  && ls -lha /tmp/docker.tgz \
-#  && tar -xz -C /tmp -f /tmp/docker.tgz \
-#  && mv /tmp/docker/* /usr/bin \
-#  && rm -rf /tmp/docker /tmp/docker.tgz \
-#  && which docker \
-#  && (docker version || true)
+# Docker.com returns the URL of the latest binary when you hit a directory listing
+# We curl this URL and `grep` the version out.
+# The output looks like this:
 
-# Install docker-compose
+#>    # To install, run the following commands as root:
+#>    curl -fsSLO https://download.docker.com/linux/static/stable/x86_64/docker-17.05.0-ce.tgz && tar --strip-components=1 -xvzf docker-17.05.0-ce.tgz -C /usr/local/bin
+#>
+#>    # Then start docker in daemon mode:
+#>    /usr/local/bin/dockerd
+
+RUN set -ex \
+      && export DOCKER_VERSION=$(curl --silent --fail --retry 3 https://download.docker.com/linux/static/stable/x86_64/ | grep -o -e 'docker-[.0-9]*\.tgz' | sort -r | head -n 1) \
+      && DOCKER_URL="https://download.docker.com/linux/static/stable/x86_64/${DOCKER_VERSION}" \
+      && echo Docker URL: $DOCKER_URL \
+      && curl --silent --show-error --location --fail --retry 3 --output /tmp/docker.tgz "${DOCKER_URL}" \
+      && ls -lha /tmp/docker.tgz \
+      && tar -xz -C /tmp -f /tmp/docker.tgz \
+      && mv /tmp/docker/* /usr/bin \
+      && rm -rf /tmp/docker /tmp/docker.tgz \
+      && which docker \
+      && (docker version || true)
+
+# docker compose
 RUN COMPOSE_URL="https://circle-downloads.s3.amazonaws.com/circleci-images/cache/linux-amd64/docker-compose-latest" \
- && curl --silent --show-error --location --fail --retry 3 --output /usr/bin/docker-compose $COMPOSE_URL \
- && chmod +x /usr/bin/docker-compose \
- && docker-compose version
+      && curl --silent --show-error --location --fail --retry 3 --output /usr/bin/docker-compose $COMPOSE_URL \
+      && chmod +x /usr/bin/docker-compose \
+      && docker-compose version
 
-# Install gcloud
-ENV CLOUD_SDK_VERSION 213.0.0
-RUN easy_install -U pip \
- && pip install -U crcmod \
- && export CLOUD_SDK_REPO="cloud-sdk-$(lsb_release -c -s)" \
- && echo "deb https://packages.cloud.google.com/apt $CLOUD_SDK_REPO main" > /etc/apt/sources.list.d/google-cloud-sdk.list \
- && curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add - \
- && apt-get update \
- && apt-get install -y google-cloud-sdk=${CLOUD_SDK_VERSION}-0 \
-        google-cloud-sdk-app-engine-python=${CLOUD_SDK_VERSION}-0 \
-        google-cloud-sdk-app-engine-python-extras=${CLOUD_SDK_VERSION}-0 \
-        google-cloud-sdk-app-engine-java=${CLOUD_SDK_VERSION}-0 \
-        google-cloud-sdk-app-engine-go=${CLOUD_SDK_VERSION}-0 \
-        google-cloud-sdk-datalab=${CLOUD_SDK_VERSION}-0 \
-        google-cloud-sdk-datastore-emulator=${CLOUD_SDK_VERSION}-0 \
-        google-cloud-sdk-pubsub-emulator=${CLOUD_SDK_VERSION}-0 \
-        google-cloud-sdk-bigtable-emulator=${CLOUD_SDK_VERSION}-0 \
-        google-cloud-sdk-cbt=${CLOUD_SDK_VERSION}-0 \
-        kubectl \
- && rm -rf /var/lib/apt/lists/* \
- && gcloud config set core/disable_usage_reporting true \
- && gcloud config set component_manager/disable_update_check true \
- && gcloud config set metrics/environment github_docker_image \
- && gcloud --version \
- && docker --version && kubectl version --client
+# install dockerize
+RUN DOCKERIZE_URL="https://circle-downloads.s3.amazonaws.com/circleci-images/cache/linux-amd64/dockerize-latest.tar.gz" \
+      && curl --silent --show-error --location --fail --retry 3 --output /tmp/dockerize-linux-amd64.tar.gz $DOCKERIZE_URL \
+      && tar -C /usr/local/bin -xzvf /tmp/dockerize-linux-amd64.tar.gz \
+      && rm -rf /tmp/dockerize-linux-amd64.tar.gz \
+      && dockerize --version
 
+RUN groupadd --gid 3434 circleci \
+      && useradd --uid 3434 --gid circleci --shell /bin/bash --create-home circleci \
+      && echo 'circleci ALL=NOPASSWD: ALL' >> /etc/sudoers.d/50-circleci \
+      && echo 'Defaults    env_keep += "DEBIAN_FRONTEND"' >> /etc/sudoers.d/env_keep
+
+# BEGIN IMAGE CUSTOMIZATIONS
 # Install terraform
-ENV TERRAFORM_VERSION 0.11.10
+ENV TERRAFORM_VERSION 0.11.11
 RUN TERRAFORM_URL=https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip \
-    && curl --silent --show-error --location --fail --retry 3 --output /tmp/terraform.zip $TERRAFORM_URL \
-    && unzip /tmp/terraform.zip -d /usr/bin/ \
-    && rm /tmp/terraform.zip
-
-# Install Node.js
-ENV NODE_VERSION 10.9.0
-RUN curl -fsSLO --compressed "https://nodejs.org/dist/v$NODE_VERSION/node-v$NODE_VERSION-linux-x64.tar.xz" \
- && tar -xJf "node-v$NODE_VERSION-linux-x64.tar.xz" -C /usr/local --strip-components=1 --no-same-owner \
- && rm "node-v$NODE_VERSION-linux-x64.tar.xz" \
- && ln -s /usr/local/bin/node /usr/local/bin/nodejs
+      && curl --silent --show-error --location --fail --retry 3 --output /tmp/terraform.zip $TERRAFORM_URL \
+      && unzip /tmp/terraform.zip -d /usr/bin/ \
+      && rm /tmp/terraform.zip
 
 # Install greenkeeper-lockfile
 ENV GREENKEEPER_LOCKFILE_VERSION 2.5.0
 RUN npm install -g greenkeeper-lockfile@$GREENKEEPER_LOCKFILE_VERSION \
- && rm -rf $HOME/.npm
+      && rm -rf $HOME/.npm
 
 # Install Verdaccio
 ENV VERDACCIO_VERSION 3.7.1
 RUN npm install -g verdaccio@$VERDACCIO_VERSION \
- && rm -rf $HOME/.npm
+      && rm -rf $HOME/.npm
 
 # Install wait-on
 ENV WAIT_ON_VERSION 2.1.0
 RUN npm install -g wait-on@$WAIT_ON_VERSION \
- && rm -rf $HOME/.npm
+      && rm -rf $HOME/.npm
+# END IMAGE CUSTOMIZATIONS
+
+USER circleci
 
 CMD ["/bin/sh"]
